@@ -16,9 +16,9 @@ public class Communicator {
 
     public Communicator() {
         this.spoken = false;
-        this.lock = new Lock();
-        this.speaker = new Condition2(lock);
-        this.listener = new Condition2(lock);
+//        this.lock = new Lock();
+//        this.speaker = new Condition2(lock);
+//        this.listener = new Condition2(lock);
     }
 
     /**
@@ -31,14 +31,14 @@ public class Communicator {
         lock.acquire();
 
         while (spoken) {
-            listener.wakeAll();
+//            listener.wake();
             speaker.sleep();
         }
 
         this.word = word;
         System.out.println(KThread.currentThread().getName() + " spoke " + word);
         spoken = true;
-        listener.wakeAll();
+        listener.wake();
 
         lock.release();
     }
@@ -59,7 +59,7 @@ public class Communicator {
         int listenedWord = this.word;
         System.out.println(KThread.currentThread().getName() + " listened " + listenedWord);
         spoken = false;
-        speaker.wakeAll();
+        speaker.wake();
 
         lock.release();
 

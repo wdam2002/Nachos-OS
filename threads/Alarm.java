@@ -36,10 +36,15 @@ public class Alarm {
      * that should be run.
      */
     public void timerInterrupt() {
+        boolean intStatus = Machine.interrupt().disable();
+
         lock.acquire();
         waitQueue.wakeAll(); // Wake up all waiting threads
         lock.release();
         KThread.currentThread().yield();
+        
+        Machine.interrupt().restore(intStatus);
+
     }
 
     /**
@@ -58,11 +63,17 @@ public class Alarm {
      * @see nachos.machine.Timer#getTime()
      */
     public void waitUntil(long x) {
+        boolean intStatus = Machine.interrupt().disable();
+
+    	
         lock.acquire();
         long wakeTime = Machine.timer().getTime() + x;
         // Wait until the wakeTime
         while (wakeTime > Machine.timer().getTime())
             waitQueue.sleep(); // Release the lock and sleep on condition variable
         lock.release();
+        
+        Machine.interrupt().restore(intStatus);
+
     }
 }
