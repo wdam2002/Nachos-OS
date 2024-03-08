@@ -62,7 +62,6 @@ public final class ElevatorBank implements Runnable {
 	ridersVector = new Vector<RiderControls>();
 
 	enableGui = false;
-	gui = null;
     }
 
     /**
@@ -136,7 +135,6 @@ public final class ElevatorBank implements Runnable {
 	for (int rider=0; rider<numRiders; rider++)
 	    numRidersPerFloor[riders[rider].floor]++;
 	
-	gui = new ElevatorGui(numFloors, numElevators, numRidersPerFloor);
     }	
 
     /**
@@ -188,14 +186,7 @@ public final class ElevatorBank implements Runnable {
 	    postRiderEvent(RiderEvent.eventDoorsOpened,
 			   elevators[elevator].openDoors(), elevator);
 
-	    if (gui != null) {
-		if (elevators[elevator].direction == dirUp)
-		    gui.clearUpButton(elevators[elevator].floor);
-		else if (elevators[elevator].direction == dirDown)
-		    gui.clearDownButton(elevators[elevator].floor);
-
-		gui.openDoors(elevator);
-	    }
+	    
 	}
 			   
         public void closeDoors(int elevator) {
@@ -203,8 +194,7 @@ public final class ElevatorBank implements Runnable {
 	    postRiderEvent(RiderEvent.eventDoorsClosed,
 			   elevators[elevator].closeDoors(), elevator);
 
-	    if (gui != null)
-		gui.closeDoors(elevator);
+
 	}
 
 	public boolean moveTo(int floor, int elevator) {
@@ -232,16 +222,7 @@ public final class ElevatorBank implements Runnable {
 			       elevators[elevator].floor, elevator);
 	    }
 
-	    if (gui != null) {
-		if (elevators[elevator].doorsOpen) {
-		    if (direction == dirUp)
-			gui.clearUpButton(elevators[elevator].floor);
-		    else if (direction == dirDown)
-			gui.clearDownButton(elevators[elevator].floor);
-		}
-	    
-		gui.setDirectionDisplay(elevator, direction);
-	    }
+
 	}
 
 	public void finish() {
@@ -274,8 +255,7 @@ public final class ElevatorBank implements Runnable {
 	void interrupt() {
 	    for (int i=0; i<numElevators; i++) {
 		if (elevators[i].atNextFloor()) {
-		    if (gui != null)
-			gui.elevatorMoved(elevators[i].floor, i);
+		    
 		    
 		    if (elevators[i].atDestination()) {
 			postEvent(ElevatorEvent.eventElevatorArrived,
@@ -488,8 +468,7 @@ public final class ElevatorBank implements Runnable {
 	    manager.postEvent(ElevatorEvent.eventUpButtonPressed,
 			      floor, -1, true);
 
-	    if (gui != null)
-		gui.pressUpButton(floor);
+
 
 	    return true;
 	}
@@ -507,8 +486,7 @@ public final class ElevatorBank implements Runnable {
 	    manager.postEvent(ElevatorEvent.eventDownButtonPressed,
 			      floor, -1, true);
 
-	    if (gui != null)
-		gui.pressDownButton(floor);
+
 
 	    return true;
 	}
@@ -519,8 +497,7 @@ public final class ElevatorBank implements Runnable {
 	    if (!elevators[elevator].enter(this, floor))
 		return false;
 
-	    if (gui != null)
-		gui.enterElevator(floor, elevator);
+
 
 	    inElevator = true;
 	    this.elevator = elevator;
@@ -537,8 +514,7 @@ public final class ElevatorBank implements Runnable {
 	    manager.postEvent(ElevatorEvent.eventFloorButtonPressed,
 			      floor, elevator, true);
 
-	    if (gui != null)
-		gui.pressFloorButton(floor, elevator);
+
 
 	    return true;
 	}
@@ -552,8 +528,7 @@ public final class ElevatorBank implements Runnable {
 	    inElevator = false;
 	    floors.add(new Integer(floor));
 
-	    if (gui != null)
-		gui.exitElevator(floor, elevator);
+
 
 	    return true;
 	}
@@ -616,5 +591,4 @@ public final class ElevatorBank implements Runnable {
     
     private boolean simulationStarted, enableGui;
     private Privilege privilege;
-    private ElevatorGui gui;
 }

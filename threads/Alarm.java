@@ -7,17 +7,26 @@ import nachos.machine.*;
  * until a certain time.
  */
 public class Alarm {
+    private Lock lock;
+    private Condition2 waitQueue;
+
     /**
      * Allocate a new Alarm. Set the machine's timer interrupt handler to this
      * alarm's callback.
      *
-     * <p><b>Note</b>: Nachos will not function correctly with more than one
+     * <p>
+     * <b>Note</b>: Nachos will not function correctly with more than one
      * alarm.
      */
     public Alarm() {
-	Machine.timer().setInterruptHandler(new Runnable() {
-		public void run() { timerInterrupt(); }
-	    });
+        lock = new Lock();
+        waitQueue = new Condition2(lock);
+
+        Machine.timer().setInterruptHandler(new Runnable() {
+            public void run() {
+                timerInterrupt();
+            }
+        });
     }
 
     /**
@@ -27,7 +36,10 @@ public class Alarm {
      * that should be run.
      */
     public void timerInterrupt() {
-	KThread.currentThread().yield();
+        lock.acquire();
+        waitQueue.wakeAll(); // Wake up all waiting threads
+        lock.release();
+        KThread.currentThread().yield();
     }
 
     /**
@@ -36,18 +48,21 @@ public class Alarm {
      * woken up (placed in the scheduler ready set) during the first timer
      * interrupt where
      *
-     * <p><blockquote>
+     * <p>
+     * <blockquote>
      * (current time) >= (WaitUntil called time)+(x)
      * </blockquote>
      *
-     * @param	x	the minimum number of clock ticks to wait.
+     * @param x the minimum number of clock ticks to wait.
      *
-     * @see	nachos.machine.Timer#getTime()
+     * @see nachos.machine.Timer#getTime()
      */
     public void waitUntil(long x) {
-	// for now, cheat just to get something working (busy waiting is bad)
-	long wakeTime = Machine.timer().getTime() + x;
-	while (wakeTime > Machine.timer().getTime())
-	    KThread.yield();
+        lock.acquire();
+        long wakeTime = Machine.timer().getTime() + x;
+        // Wait until the wakeTime
+        while (wakeTime > Machine.timer().getTime())
+            waitQueue.sleep(); // Release the lock and sleep on condition variable
+        lock.release();
     }
 }

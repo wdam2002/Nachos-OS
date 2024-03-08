@@ -85,18 +85,25 @@ public class ThreadGrader1 extends BasicTestGrader
       this.n = n;
     }
     
-    public void run ()
-    {
-      lock.acquire();
-      while (turn != n)
-      {
-        cond[n].sleep();
-      }
-      // System.out.println(KThread.currentThread() + " print " + n);
-      ++count;
-      turn = (turn + 1) % total;
-      cond[turn].wake();
-      lock.release();
+    public void run() {
+        System.out.println("Thread " + n + ": Acquiring lock");
+        lock.acquire();
+        try {
+            System.out.println("Thread " + n + ": Lock acquired");
+            while (turn != n) {
+                System.out.println("Thread " + n + ": Waiting for condition");
+                cond[n].sleep();
+                System.out.println("Thread " + n + ": Woke up from sleep");
+            }
+            System.out.println("Thread " + n + ": Condition met, printing");
+//             System.out.println(KThread.currentThread() + " print " + n);
+            ++count;
+            turn = (turn + 1) % total;
+            cond[turn].wake();
+        } finally {
+            System.out.println("Thread " + n + ": Releasing lock");
+            lock.release();
+        }
     }
   }
 }
