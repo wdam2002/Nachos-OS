@@ -1,6 +1,7 @@
 package nachos.threads;
 
 import nachos.machine.*;
+import java.util.PriorityQueue;
 
 /**
  * Uses the hardware timer to provide preemption, and to allow threads to sleep
@@ -8,7 +9,7 @@ import nachos.machine.*;
  */
 public class Alarm {
     private Lock lock;
-    private Condition2 waitQueue;
+    private PriorityQueue<WaitThread> waitQueue;
 
     /**
      * Allocate a new Alarm. Set the machine's timer interrupt handler to this
@@ -20,15 +21,15 @@ public class Alarm {
      */
     public Alarm() {
         lock = new Lock();
-        waitQueue = new Condition2(lock);
-
+        waitQueue = new PriorityQueue<>();
+        
         Machine.timer().setInterruptHandler(new Runnable() {
             public void run() {
                 timerInterrupt();
             }
         });
     }
-
+    
     /**
      * The timer interrupt handler. This is called by the machine's timer
      * periodically (approximately every 500 clock ticks). Causes the current
@@ -36,17 +37,19 @@ public class Alarm {
      * that should be run.
      */
     public void timerInterrupt() {
-        boolean intStatus = Machine.interrupt().disable();
-
         lock.acquire();
-        waitQueue.wakeAll(); // Wake up all waiting threads
-        lock.release();
-        KThread.currentThread().yield();
+        long currentTime = Machine.timer().getTime();
         
-        Machine.interrupt().restore(intStatus);
-
+        // Wake up threads whose wake time has been reached
+        while (!waitQueue.isEmpty() && waitQueue.peek().getWakeTime() <= currentTime) {
+        	WaitThread WaitThread = waitQueue.poll();
+        	WaitThread.thread.ready(); // Put the thread on the ready queue
+        }
+        
+        lock.release();
+        KThread.currentThread().yield(); // Yield the CPU
     }
-
+    
     /**
      * Put the current thread to sleep for at least <i>x</i> ticks,
      * waking it up in the timer interrupt handler. The thread must be
@@ -63,17 +66,36 @@ public class Alarm {
      * @see nachos.machine.Timer#getTime()
      */
     public void waitUntil(long x) {
-        boolean intStatus = Machine.interrupt().disable();
-
-    	
         lock.acquire();
         long wakeTime = Machine.timer().getTime() + x;
-        // Wait until the wakeTime
-        while (wakeTime > Machine.timer().getTime())
-            waitQueue.sleep(); // Release the lock and sleep on condition variable
-        lock.release();
         
-        Machine.interrupt().restore(intStatus);
+        // Create a new SleepingThread object and add it to the waitQueue
+        WaitThread sleepingThread = new WaitThread(KThread.currentThread(), wakeTime);
+        waitQueue.add(sleepingThread);
+        
+        // Put the thread to sleep using Condition2
+        sleepingThread.condition2.sleep();
+        lock.release();
+    }
 
+    private class WaitThread implements Comparable<WaitThread> {
+        public KThread thread;
+        public long wakeTime;
+        public Condition2 condition2;
+
+        public WaitThread(KThread thread, long wakeTime) {
+            this.thread = thread;
+            this.wakeTime = wakeTime;
+            this.condition2 = new Condition2(lock);
+        }
+
+        public long getWakeTime() {
+            return wakeTime;
+        }
+
+        @Override
+        public int compareTo(WaitThread other) {
+            return Long.compare(wakeTime, other.getWakeTime());
+        }
     }
 }

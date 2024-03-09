@@ -9,6 +9,7 @@ import java.security.Permission;
 import java.io.FilePermission;
 import java.util.PropertyPermission;
 import java.net.NetPermission;
+import java.awt.AWTPermission;
 import java.security.PrivilegedAction;
 import java.security.PrivilegedExceptionAction;
 import java.security.PrivilegedActionException;
@@ -201,7 +202,11 @@ public class NachosSecurityManager extends SecurityManager {
 		}
 	    }
 
-
+	    if (perm instanceof AWTPermission) {
+		// permit AWT stuff
+		if (name.equals("accessEventQueue"))
+		    return;
+	    }
 	}
 
 	// some are always allowed
