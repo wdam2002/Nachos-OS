@@ -22,14 +22,14 @@ public class Alarm {
     public Alarm() {
         lock = new Lock();
         waitQueue = new PriorityQueue<>();
-        
+
         Machine.timer().setInterruptHandler(new Runnable() {
             public void run() {
                 timerInterrupt();
             }
         });
     }
-    
+
     /**
      * The timer interrupt handler. This is called by the machine's timer
      * periodically (approximately every 500 clock ticks). Causes the current
@@ -39,17 +39,16 @@ public class Alarm {
     public void timerInterrupt() {
         lock.acquire();
         long currentTime = Machine.timer().getTime();
-        
-        // Wake up threads whose wake time has been reached
-        while (!waitQueue.isEmpty() && waitQueue.peek().getWakeTime() <= currentTime) {
-        	WaitThread WaitThread = waitQueue.poll();
-        	WaitThread.thread.ready(); // Put the thread on the ready queue
+
+        while (!waitQueue.isEmpty() && waitQueue.peek().getWakeTime() >= currentTime) {
+            WaitThread WaitThread = waitQueue.poll();
+            WaitThread.thread.ready();
         }
-        
+
         lock.release();
-        KThread.currentThread().yield(); // Yield the CPU
+        KThread.currentThread().yield();
     }
-    
+
     /**
      * Put the current thread to sleep for at least <i>x</i> ticks,
      * waking it up in the timer interrupt handler. The thread must be
@@ -68,12 +67,12 @@ public class Alarm {
     public void waitUntil(long x) {
         lock.acquire();
         long wakeTime = Machine.timer().getTime() + x;
-        
-        // Create a new SleepingThread object and add it to the waitQueue
+
         WaitThread sleepingThread = new WaitThread(KThread.currentThread(), wakeTime);
         waitQueue.add(sleepingThread);
-        
-        // Put the thread to sleep using Condition2
+
+        sleepingThread.thread.yield();
+
         sleepingThread.condition2.sleep();
         lock.release();
     }

@@ -1,41 +1,90 @@
 package nachos.threads;
 
+import java.util.LinkedList;
+
 import nachos.machine.*;
 
 /**
- * A <i>communicator</i> allows threads to synchronously exchange 32-bit
- * messages. Multiple threads can be waiting to <i>speak</i>,
- * and multiple threads can be waiting to <i>listen</i>. But there should never
- * be a time when both a speaker and a listener are waiting, because the two
- * threads can be paired off at this point.
+ * A communicator allows threads to synchronously exchange 32-bit messages.
  */
 public class Communicator {
-    /**
-     * Allocate a new communicator.
-     */
+
+    LinkedList<WaitingThread> speakingQueue = new LinkedList<WaitingThread>();
+    LinkedList<WaitingThread> listeningQueue = new LinkedList<WaitingThread>();
+
+    private Lock lock;
+
     public Communicator() {
+        lock = new Lock();
+    }
+
+    private static class WaitingThread {
+        private final Lock lock;
+        private final Condition condition;
+        private Integer word;
+
+        public WaitingThread(Integer word) {
+            this.word = word;
+            this.lock = new Lock();
+            this.condition = new Condition(this.lock);
+        }
     }
 
     /**
      * Wait for a thread to listen through this communicator, and then transfer
-     * <i>word</i> to the listener.
+     * word to the listener.
      *
-     * <p>
-     * Does not return until this thread is paired up with a listening thread.
-     * Exactly one listener should receive <i>word</i>.
-     *
-     * @param	word	the integer to transfer.
+     * @param word the integer to transfer.
      */
     public void speak(int word) {
+        this.lock.acquire();
+        if (!listeningQueue.isEmpty()) {
+            WaitingThread listener = listeningQueue.pop();
+            word = listener.word;
+
+            listener.lock.acquire();
+            listener.condition.wake();
+            listener.lock.release();
+        } else {
+            WaitingThread speaker = new WaitingThread(null);
+            speaker.lock.acquire();
+            listeningQueue.add(speaker);
+            this.lock.release();
+            speaker.condition.sleep();
+            this.lock.acquire();
+            word = speaker.word;
+            speaker.lock.release();
+        }
+        this.lock.release();
     }
 
     /**
      * Wait for a thread to speak through this communicator, and then return
-     * the <i>word</i> that thread passed to <tt>speak()</tt>.
+     * the word that thread passed to speak().
      *
-     * @return	the integer transferred.
-     */    
+     * @return the integer transferred.
+     */
     public int listen() {
-	return 0;
+        this.lock.acquire();
+        int word;
+        if (!speakingQueue.isEmpty()) {
+            WaitingThread speaker = speakingQueue.pop();
+            word = speaker.word;
+
+            speaker.lock.acquire();
+            speaker.condition.wake();
+            speaker.lock.release();
+        } else {
+            WaitingThread listener = new WaitingThread(null);
+            listener.lock.acquire();
+            listeningQueue.add(listener);
+            this.lock.release();
+            listener.condition.sleep();
+            this.lock.acquire();
+            word = listener.word;
+            listener.lock.release();
+        }
+        this.lock.release();
+        return word;
     }
 }
