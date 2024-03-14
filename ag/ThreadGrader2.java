@@ -98,6 +98,7 @@ public class ThreadGrader2 extends BasicTestGrader
     }
     while (count != total)
     {
+    	System.out.println(Machine.timer().getTime());
       assertTrue(Machine.timer().getTime() < 10000,
         "Too many ticks wasted on \nTest ThreadGrader2.c");
       KThread.yield();
