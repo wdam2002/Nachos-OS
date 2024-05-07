@@ -345,6 +345,180 @@ public class UserProcess {
 	Lib.assertNotReached("Machine.halt() did not halt machine!");
 	return 0;
     }
+    
+    /**
+     * Handle the exit() system call. 
+     * @return 
+     */
+    private int handleExit(int status) {
+    	
+    	for (OpenFile fd : fileDescriptors) {
+    		if (fd != null)
+    			fd.close();
+    	}
+    	coff.close();
+    	
+    	UThread.finish();	
+    	Machine.halt();
+    	return 0;
+
+    }
+    
+    // Handle different syscalls
+    private int handleCreate(int vaddr) {
+    	OpenFile stdIn = UserKernel.console.openForReading();
+    	OpenFile stdOut = UserKernel.console.openForWriting();
+    	
+    	fileDescriptors[0] = stdIn;
+    	fileDescriptors[1] = stdOut;
+    	
+        String filename = readVirtualMemoryString(vaddr, 256);
+        if (filename == null) {
+            return -1; 
+        }
+        
+        if (ThreadedKernel.fileSystem.open(filename, true) == null) {
+            return -1;
+        }
+        
+        return 0; 
+    }
+    
+    private int handleWrite(int fd, int bufferAddr, int count) {
+    	OpenFile stdIn = UserKernel.console.openForReading();
+    	OpenFile stdOut = UserKernel.console.openForWriting();
+    	
+    	fileDescriptors[0] = stdIn;
+    	fileDescriptors[1] = stdOut;
+
+    	OpenFile file = getFD(fd);
+        if (file == null) {
+            return -1;
+        }
+        
+        byte[] buffer = new byte[count];
+        int bytesRead = readVirtualMemory(bufferAddr, buffer, 0, count);
+        
+        int bytesWritten = file.write(buffer, 0, bytesRead);
+        
+        
+        return bytesWritten; 
+    }
+    
+    private int handleOpen(int vaddr) {
+    	OpenFile stdIn = UserKernel.console.openForReading();
+    	OpenFile stdOut = UserKernel.console.openForWriting();
+    	
+    	fileDescriptors[0] = stdIn;
+    	fileDescriptors[1] = stdOut;
+
+        String filename = readVirtualMemoryString(vaddr, 256);
+        if (filename == null) {
+            return -1; 
+        }
+        
+        OpenFile file = ThreadedKernel.fileSystem.open(filename, false);
+        if (file == null) {
+            return -1; 
+        }
+        
+        int fd = addFD(file);
+        if (fd == -1) {
+            return -1; 
+        }
+        
+        return fd; 
+    }
+    
+    private int handleRead(int fd, int bufferAddr, int count) {
+    	OpenFile stdIn = UserKernel.console.openForReading();
+    	OpenFile stdOut = UserKernel.console.openForWriting();
+    	
+    	fileDescriptors[0] = stdIn;
+    	fileDescriptors[1] = stdOut;
+    	
+        OpenFile file = getFD(fd);
+        if (file == null) {
+            return -1; 
+        }
+        
+        byte[] buffer = new byte[count];
+        int bytesRead = file.read(buffer, 0, count);
+        
+        int bytesWritten = writeVirtualMemory(bufferAddr, buffer, 0, bytesRead);
+        if (bytesWritten != bytesRead) {
+            return -1;
+        }
+        
+        return bytesRead; 
+    }
+    
+    private int handClose(int fd) {
+    	OpenFile stdIn = UserKernel.console.openForReading();
+    	OpenFile stdOut = UserKernel.console.openForWriting();
+    	
+    	fileDescriptors[0] = stdIn;
+    	fileDescriptors[1] = stdOut;
+    	
+        OpenFile file = removeFD(fd);
+        if (file == null) {
+            return -1;
+        }
+        
+        file.close();
+        
+        return 0; 
+    }
+    
+    private int handleUnlink(int vaddr) {
+    	OpenFile stdIn = UserKernel.console.openForReading();
+    	OpenFile stdOut = UserKernel.console.openForWriting();
+    	
+    	fileDescriptors[0] = stdIn;
+    	fileDescriptors[1] = stdOut;
+    	
+        String filename = readVirtualMemoryString(vaddr, 256);
+        if (filename == null) {
+            return -1;
+        }
+        
+        if (!ThreadedKernel.fileSystem.remove(filename)) {
+            return -1; 
+        }
+        
+        return 0; 
+    }
+
+    // openFiles 
+    // fd 0 is StdIn
+    // fd 1 is StdOut
+	private OpenFile[] fileDescriptors = new OpenFile[18];
+	
+	private OpenFile getFD(int fd) {
+	    if (fd < 0 || fd >= fileDescriptors.length) {
+	        return null; 
+	    }
+	    return fileDescriptors[fd];
+	}
+
+	private OpenFile removeFD(int fd) {
+	    OpenFile file = getFD(fd);
+	    if (file != null) {
+	    	fileDescriptors[fd] = null;
+	    }
+	    return file;
+	}
+
+	private int addFD(OpenFile file) {
+	    for (int i = 0; i < fileDescriptors.length; i++) {
+	        if (fileDescriptors[i] == null) {
+	        	fileDescriptors[i] = file;
+	            return i;
+	        }
+	    }
+	    return -1; 
+	}
+
 
 
     private static final int
@@ -358,6 +532,7 @@ public class UserProcess {
 	syscallWrite = 7,
 	syscallClose = 8,
 	syscallUnlink = 9;
+    
 
     /**
      * Handle a syscall exception. Called by <tt>handleException()</tt>. The
@@ -391,16 +566,32 @@ public class UserProcess {
 	switch (syscall) {
 	case syscallHalt:
 	    return handleHalt();
+	case syscallExit:
+	    return handleExit(a0);
+	case syscallCreate:
+	    return handleCreate(a0);
+	case syscallOpen:
+	    return handleOpen(a0);
+	case syscallRead:
+	    return handleRead(a0, a1, a2);
+	case syscallWrite:
+	    return handleWrite(a0, a1, a2);
+	case syscallClose:
+	    return handClose(a0);
+	case syscallUnlink:
+	    return handleUnlink(a0);
+
 
 
 	default:
+		System.out.print(syscall);
 	    Lib.debug(dbgProcess, "Unknown syscall " + syscall);
 	    Lib.assertNotReached("Unknown system call!");
 	}
 	return 0;
     }
 
-    /**
+	/**
      * Handle a user exception. Called by
      * <tt>UserKernel.exceptionHandler()</tt>. The
      * <i>cause</i> argument identifies which exception occurred; see the
