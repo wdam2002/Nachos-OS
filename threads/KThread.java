@@ -191,7 +191,13 @@ public class KThread {
 	Lib.assertTrue(toBeDestroyed == null);
 	toBeDestroyed = currentThread;
 
+	currentThread.lock.acquire();
 
+
+	currentThread.waitingThreadsQ.wakeAll();
+	
+	currentThread.lock.release();
+	
 	currentThread.status = statusFinished;
 	
 	sleep();
@@ -273,10 +279,12 @@ public class KThread {
      * thread.
      */
     public void join() {
-	Lib.debug(dbgThread, "Joining to thread: " + toString());
+        Lib.debug(dbgThread, "Joining to thread: " + toString());
+        Lib.assertTrue(this != currentThread);
 
-	Lib.assertTrue(this != currentThread);
-
+        lock.acquire();
+        waitingThreadsQ.sleep();
+        lock.release();
     }
 
     /**
@@ -431,6 +439,8 @@ public class KThread {
     private String name = "(unnamed thread)";
     private Runnable target;
     private TCB tcb;
+    private Lock lock = new Lock();
+    private Condition2 waitingThreadsQ = new Condition2(lock);
 
     /**
      * Unique identifer for this thread. Used to deterministically compare
@@ -444,4 +454,5 @@ public class KThread {
     private static KThread currentThread = null;
     private static KThread toBeDestroyed = null;
     private static KThread idleThread = null;
+    
 }
